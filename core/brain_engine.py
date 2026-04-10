@@ -33,20 +33,43 @@ Strictly adhere to security and modularity constraints."""
         headers = {'Content-Type': 'application/json'}
         if self.api_key:
             headers['Authorization'] = f"Bearer {self.api_key}"
+
+        # 根據 URL 判斷是 OpenAI-compatible (vLLM) 還是 Ollama
+        if "v1" in self.api_url:
+            endpoint = f"{self.api_url.rstrip('/')}/chat/completions"
+            is_openai = True
+        else:
+            endpoint = f"{self.api_url.rstrip('/')}/chat"
+            is_openai = False
             
-        response = requests.post(f"{self.api_url}/chat", json=payload, headers=headers, stream=True)
+        response = requests.post(endpoint, json=payload, headers=headers, stream=True)
         response.raise_for_status()
 
         assistant_response = ""
         for line in response.iter_lines():
             if line:
                 decoded_line = line.decode('utf-8')
+                
+                # 處理 OpenAI SSE 格式 (data: {...})
+                if decoded_line.startswith("data: "):
+                    decoded_line = decoded_line[6:]
+                if decoded_line.strip() == "[DONE]":
+                    break
+                    
                 try:
                     data = json.loads(decoded_line)
-                    if "message" in data and "content" in data["message"]:
-                        content = data["message"]["content"]
-                        assistant_response += content
-                        yield content
+                    if is_openai:
+                        if "choices" in data and len(data["choices"]) > 0:
+                            delta = data["choices"][0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                assistant_response += content
+                                yield content
+                    else:
+                        if "message" in data and "content" in data["message"]:
+                            content = data["message"]["content"]
+                            assistant_response += content
+                            yield content
                 except json.JSONDecodeError:
                     pass
 
