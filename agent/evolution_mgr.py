@@ -119,7 +119,9 @@ class EvolutionManager:
                 with open(script_path, "w", encoding="utf-8") as f:
                     f.write(code)
                 try:
-                    res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True, encoding="utf-8", timeout=10)
+                    env = os.environ.copy()
+                    env["PYTHONIOENCODING"] = "utf-8"
+                    res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True, encoding="utf-8", timeout=10, env=env)
                     if res.returncode != 0:
                         console.print(f"[bold red]❌ Execution failed locally:[/bold red]\n{res.stderr}")
                         self._self_refine(user_request, code, res.stderr)
