@@ -109,7 +109,33 @@ Strictly adhere to security and modularity constraints."""
                 name = data["message"]["content"].strip()
             
             import re
+            
+            # Aggressively extract just the last sequence of word characters in case the LLM was verbose
+            # e.g., if it output "<thinking>...</thinking> get_realtime_news", we just want "get_realtime_news"
+            
+            # First remove any thinking tags
+            name = re.sub(r'<thinking>.*?</thinking>', '', name, flags=re.DOTALL)
+            
+            # Grab the last continuous word-like chunk that resembles a snake_case identifier
+            matches = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', name)
+            if matches:
+                # We'll take the longest one or the last one that looks reasonable
+                # But typically the actual target is the last word if it was chatting, or just the word if it obeyed.
+                # Let's sort by length, assuming the snake_case name is the longest token, 
+                # or just use the last word that has an underscore or is reasonably long.
+                candidates = [m for m in matches if '_' in m or len(m) > 4]
+                if candidates:
+                    name = candidates[-1] # Usually the final conclusion
+                else:
+                    name = matches[-1]
+            else:
+                name = "unnamed_task"
+                
             name = re.sub(r'[^a-zA-Z0-9_]', '', name.replace('-', '_'))
+            
+            # Truncate to a reasonable length for a filename
+            name = name[:40]
+            
             return f"skill_{name.strip('_')}"
         except Exception:
             return None
