@@ -10,6 +10,7 @@ def load_config():
     return {
         "model": "gemma4",
         "api_url": "http://localhost:11434/api",
+        "api_key": "",
         "skills_dir": "~/.g4a/skills"
     }
 

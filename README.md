@@ -46,6 +46,7 @@ python main.py
 
 - `/brain <model>`: 切換使用的模型名稱 (例如：`/brain gemma:7b`)。
 - `/api <url>`: 修改後端 API 地址 (預設為 `http://localhost:11434/api`)。
+- `/apikey <key>`: 設定 API Key 以進行身分驗證。
 - `/skills`: 列出當前系統已學會的所有技能。
 - `/reset`: 清空當前的對話記憶上下文。
 - `/help`: 顯示幫助訊息。

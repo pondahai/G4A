@@ -77,6 +77,19 @@ def handle_command(command_str: str, config: dict, brain: BrainEngine, evo_mgr: 
         else:
             console.print(f"[yellow]Current API URL:[/yellow] {config['api_url']}")
             
+    elif cmd == "/apikey":
+        if args:
+            config["api_key"] = args
+            brain.api_key = args
+            from main import save_config
+            save_config(config)
+            console.print(f"[green]✅ API Key updated.[/green]")
+        else:
+            masked_key = config.get('api_key', '')
+            if masked_key:
+                masked_key = masked_key[:4] + "*" * (len(masked_key) - 8) + masked_key[-4:] if len(masked_key) > 8 else "****"
+            console.print(f"[yellow]Current API Key:[/yellow] {masked_key if masked_key else 'Not set'}")
+            
     elif cmd == "/skills":
         skills = evo_mgr.list_skills()
         if skills:

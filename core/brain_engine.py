@@ -6,6 +6,7 @@ class BrainEngine:
     def __init__(self, config):
         self.model = config.get("model", "gemma4")
         self.api_url = config.get("api_url", "http://localhost:11434/api")
+        self.api_key = config.get("api_key", "")
         self.history = []
         
         # System prompt from spec
@@ -30,6 +31,9 @@ Strictly adhere to security and modularity constraints."""
         }
         
         headers = {'Content-Type': 'application/json'}
+        if self.api_key:
+            headers['Authorization'] = f"Bearer {self.api_key}"
+            
         response = requests.post(f"{self.api_url}/chat", json=payload, headers=headers, stream=True)
         response.raise_for_status()
 
