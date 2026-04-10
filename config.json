@@ -1,0 +1,5 @@
+{
+    "model": "gemma4",
+    "api_url": "http://localhost:11434/api",
+    "skills_dir": "~/.g4a/skills"
+}
