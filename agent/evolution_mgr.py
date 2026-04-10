@@ -55,14 +55,17 @@ class EvolutionManager:
         prompt = f"""
         You are in Code Generation Mode.
         The user asked for: "{user_request}"
-        This task cannot be fulfilled natively. Please write a Python script that fulfills this request.
+        This task cannot be fulfilled natively. Please write a Python script that ACTUALLY performs the requested computation, fetches the real data, or executes the system action.
+        DO NOT hardcode, hallucinate, or simulate the final result.
         
         CRITICAL SECURITY REQUIREMENTS:
         1. Output ONLY valid Python code within a ```python block.
-        2. DO NOT use the 'os', 'subprocess', 'sys', or 'shutil' modules under any circumstances. They are blocked by the AST scanner.
+        2. DO NOT use 'os', 'subprocess', 'sys', or 'shutil' under any circumstances. They are blocked by the AST scanner. 
+           (Tip: Use 'urllib.request', 'requests', 'math', etc. instead.)
         3. Do not use 'eval', 'exec', or 'open'.
-        4. The code must define a function called `run_skill()` that executes the core logic, returns a string result, and prints the result.
-        5. Make it robust and modular.
+        4. The code must define a function called `run_skill()` that executes the core logic.
+        5. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())`
+        6. Make it robust and modular.
         """
         
         console.print("[yellow]🧠 Brain is generating new code...[/yellow]")
@@ -108,10 +111,23 @@ class EvolutionManager:
                 return
             console.print(f"[green]✅ Execution successful:[/green]\n{result['output']}")
         else:
-            console.print("[yellow]⚠️ Docker not available, skipping sandbox execution. Running locally...[/yellow]")
-            # Dangerous, but just for demo purposes if Docker is off
-            # In real environment, might want to block this completely.
-            pass
+            console.print("[yellow]⚠️ Docker not available, executing locally (Warning: Unsandboxed)...[/yellow]")
+            import subprocess
+            import tempfile
+            with tempfile.TemporaryDirectory() as temp_dir:
+                script_path = Path(temp_dir) / "skill.py"
+                with open(script_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                try:
+                    res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True, timeout=10)
+                    if res.returncode != 0:
+                        console.print(f"[bold red]❌ Execution failed locally:[/bold red]\n{res.stderr}")
+                        self._self_refine(user_request, code, res.stderr)
+                        return
+                    console.print(f"[green]✅ Execution successful:[/green]\n{res.stdout}")
+                except Exception as e:
+                    console.print(f"[bold red]❌ Execution failed:[/bold red] {e}")
+                    return
 
         # Save to skill library
         skill_name = self._generate_skill_name(user_request)
