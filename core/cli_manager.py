@@ -108,6 +108,7 @@ def handle_command(command_str: str, config: dict, brain: BrainEngine, evo_mgr: 
 [bold]Available Commands:[/bold]
   /brain <model>  - Switch the current model.
   /api <url>      - Change the backend API URL.
+  /apikey <key>   - Set the API Key for authentication.
   /skills         - List all currently learned skills.
   /reset          - Clear conversation memory.
   /help           - Show this message.
