@@ -147,7 +147,13 @@ class EvolutionManager:
         console.print("[red]Self-refinement loop triggered. (Not fully implemented in MVP to prevent loops)[/red]")
 
     def _generate_skill_name(self, request: str) -> str:
-        # Simple slugify
+        # Try to ask LLM for a good name
+        console.print("[dim]Thinking of a good name for the skill...[/dim]")
+        llm_name = self.brain.generate_short_name(request)
+        if llm_name:
+            return llm_name
+            
+        # Fallback simple slugify
         clean = "".join(c if c.isalnum() else "_" for c in request.lower())
         # Trim multiple underscores
         import re
