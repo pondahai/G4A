@@ -58,14 +58,14 @@ class EvolutionManager:
         This task cannot be fulfilled natively. Please write a Python script that ACTUALLY performs the requested computation, fetches the real data, or executes the system action.
         DO NOT hardcode, hallucinate, or simulate the final result.
         
-        CRITICAL SECURITY REQUIREMENTS:
+        CRITICAL SECURITY & ENVIRONMENT REQUIREMENTS:
         1. Output ONLY valid Python code within a ```python block.
         2. DO NOT use 'os', 'subprocess', 'sys', or 'shutil' under any circumstances. They are blocked by the AST scanner. 
-           (Tip: Use 'urllib.request', 'requests', 'math', etc. instead.)
         3. Do not use 'eval', 'exec', or 'open'.
-        4. The code must define a function called `run_skill()` that executes the core logic.
-        5. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())`
-        6. Make it robust and modular.
+        4. ONLY use Python built-in standard libraries (e.g., urllib, json, re, math, html.parser) and the 'requests' library. DO NOT use third-party packages like BeautifulSoup (bs4), pandas, or selenium.
+        5. The code must define a function called `run_skill()` that executes the core logic and returns a string.
+        6. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())`
+        7. Make it robust and modular.
         """
         
         console.print("[yellow]🧠 Brain is generating new code...[/yellow]")
