@@ -57,11 +57,12 @@ class EvolutionManager:
         The user asked for: "{user_request}"
         This task cannot be fulfilled natively. Please write a Python script that fulfills this request.
         
-        Requirements:
+        CRITICAL SECURITY REQUIREMENTS:
         1. Output ONLY valid Python code within a ```python block.
-        2. Do not use 'os.system', 'subprocess', or other dangerous modules.
-        3. The code must define a function called `run_skill()` that executes the core logic and prints the result.
-        4. Make it robust and modular.
+        2. DO NOT use the 'os', 'subprocess', 'sys', or 'shutil' modules under any circumstances. They are blocked by the AST scanner.
+        3. Do not use 'eval', 'exec', or 'open'.
+        4. The code must define a function called `run_skill()` that executes the core logic, returns a string result, and prints the result.
+        5. Make it robust and modular.
         """
         
         console.print("[yellow]🧠 Brain is generating new code...[/yellow]")
