@@ -82,11 +82,26 @@ def run_cli(config):
                         
             elif "EXECUTE_SKILL:" in full_response:
                 import re
-                match = re.search(r'EXECUTE_SKILL:\s*([a-zA-Z0-9_]+)', full_response)
+                import json
+                
+                # Match EXECUTE_SKILL: skill_name {optional_json_params}
+                match = re.search(r'EXECUTE_SKILL:\s*([a-zA-Z0-9_]+)\s*(\{.*?\})?', full_response, re.DOTALL)
                 if match:
                     skill_name = match.group(1)
+                    param_str = match.group(2)
+                    
+                    params = {}
+                    if param_str:
+                        try:
+                            params = json.loads(param_str)
+                        except json.JSONDecodeError:
+                            console.print("[dim yellow]Warning: Failed to parse parameters as JSON. Proceeding without parameters.[/dim yellow]")
+                            
                     console.print(f"\n[bold yellow]⚙️ Executing existing skill: {skill_name}...[/bold yellow]")
-                    result = evo_mgr.execute_skill(skill_name)
+                    if params:
+                        console.print(f"[dim]With parameters: {params}[/dim]")
+                        
+                    result = evo_mgr.execute_skill(skill_name, **params)
                     console.print("\n[bold green]🎯 Raw Execution Result:[/bold green]")
                     console.print(result)
                     brain.history.append({"role": "system", "content": f"The skill {skill_name} returned this result: {result}"})

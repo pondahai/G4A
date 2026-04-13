@@ -51,12 +51,18 @@ class EvolutionManager:
     def list_skills(self):
         return list(self.loaded_skills.keys())
 
-    def execute_skill(self, skill_name: str) -> str:
+    def execute_skill(self, skill_name: str, **kwargs) -> str:
         if skill_name in self.loaded_skills:
             try:
                 module = self.loaded_skills[skill_name]
                 if hasattr(module, 'run_skill'):
-                    result = module.run_skill()
+                    # Check if run_skill accepts arguments
+                    import inspect
+                    sig = inspect.signature(module.run_skill)
+                    if sig.parameters:
+                        result = module.run_skill(**kwargs)
+                    else:
+                        result = module.run_skill()
                     return str(result)
                 else:
                     return f"Error: Skill module '{skill_name}' is missing 'run_skill()' function."
@@ -91,9 +97,10 @@ class EvolutionManager:
         2. DO NOT use 'os', 'subprocess', 'sys', or 'shutil' under any circumstances. They are blocked by the AST scanner. 
         3. Do not use 'eval', 'exec', or 'open'.
         4. ONLY use Python built-in standard libraries (e.g., urllib, json, re, math, html.parser) and the 'requests' library. DO NOT use third-party packages like BeautifulSoup (bs4), pandas, or selenium.
-        5. The code must define a function called `run_skill()` that executes the core logic and returns a string.
-        6. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())`
-        7. Make it robust and modular.
+        5. The code must define a function called `run_skill(**kwargs)` that accepts arbitrary keyword arguments, executes the core logic, and returns a string.
+        6. If the task requires dynamic parameters (e.g., a search query), use `kwargs.get('param_name', 'default_value')` inside `run_skill`.
+        7. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())` (For testing purposes, default behavior without parameters should still work).
+        8. Make it robust and modular.
         """
         
         console.print("[yellow]🧠 Brain is rewriting the code...[/yellow]")
@@ -117,9 +124,10 @@ class EvolutionManager:
         2. DO NOT use 'os', 'subprocess', 'sys', or 'shutil' under any circumstances. They are blocked by the AST scanner. 
         3. Do not use 'eval', 'exec', or 'open'.
         4. ONLY use Python built-in standard libraries (e.g., urllib, json, re, math, html.parser) and the 'requests' library. DO NOT use third-party packages like BeautifulSoup (bs4), pandas, or selenium.
-        5. The code must define a function called `run_skill()` that executes the core logic and returns a string.
-        6. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())`
-        7. Make it robust and modular.
+        5. The code must define a function called `run_skill(**kwargs)` that accepts arbitrary keyword arguments, executes the core logic, and returns a string.
+        6. If the task requires dynamic parameters (e.g., a search query), use `kwargs.get('param_name', 'default_value')` inside `run_skill`.
+        7. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())` (For testing purposes, default behavior without parameters should still work).
+        8. Make it robust and modular.
         """
         
         console.print("[yellow]🧠 Brain is generating new code...[/yellow]")
