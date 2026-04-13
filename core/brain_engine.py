@@ -25,7 +25,34 @@ Strictly adhere to security and modularity constraints."""
     def clear_memory(self):
         self.history = []
 
+    def _compress_history(self, max_messages=20, max_chars=24000):
+        """
+        Simple sliding window and character limit compression.
+        Ensures the context doesn't blow up the LLM's token limit.
+        """
+        compressed = False
+        # 1. Message count limit
+        if len(self.history) > max_messages:
+            self.history = self.history[-max_messages:]
+            compressed = True
+            
+        # 2. Character length limit (rough token estimation)
+        while len(self.history) >= 2:
+            total_chars = sum(len(m.get("content", "")) for m in self.history)
+            if total_chars <= max_chars:
+                break
+            # Drop the oldest user-assistant pair
+            self.history = self.history[2:]
+            compressed = True
+            
+        return compressed
+
     def stream_chat(self, user_input, is_retry=False):
+        # 壓縮上下文 (Context Compression)
+        if self._compress_history():
+            from rich.console import Console
+            Console().print("[dim yellow]🗜️ Context compressed to fit memory limits.[/dim yellow]")
+
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(self.history)
         
