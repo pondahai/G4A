@@ -64,6 +64,47 @@ class EvolutionManager:
                 return f"Error executing {skill_name}: {e}"
         return f"Skill {skill_name} not found."
 
+    def update_and_test_skill(self, user_request: str, skill_name: str) -> str:
+        skill_path = self.skills_dir / f"{skill_name}.py"
+        if not skill_path.exists():
+            console.print(f"[red]❌ Cannot update skill '{skill_name}' because it does not exist.[/red]")
+            return None
+            
+        with open(skill_path, "r", encoding="utf-8") as f:
+            old_code = f.read()
+            
+        prompt = f"""
+        You are in Code Update Mode.
+        The user asked to modify the existing skill '{skill_name}'.
+        User request: "{user_request}"
+        
+        Here is the EXISTING code for this skill:
+        ```python
+{old_code}
+        ```
+        
+        Please rewrite the Python script to incorporate the requested changes.
+        DO NOT hardcode, hallucinate, or simulate the final result.
+        
+        CRITICAL SECURITY & ENVIRONMENT REQUIREMENTS:
+        1. Output ONLY valid Python code within a ```python block.
+        2. DO NOT use 'os', 'subprocess', 'sys', or 'shutil' under any circumstances. They are blocked by the AST scanner. 
+        3. Do not use 'eval', 'exec', or 'open'.
+        4. ONLY use Python built-in standard libraries (e.g., urllib, json, re, math, html.parser) and the 'requests' library. DO NOT use third-party packages like BeautifulSoup (bs4), pandas, or selenium.
+        5. The code must define a function called `run_skill()` that executes the core logic and returns a string.
+        6. At the bottom of the script, include: `if __name__ == "__main__": print(run_skill())`
+        7. Make it robust and modular.
+        """
+        
+        console.print("[yellow]🧠 Brain is rewriting the code...[/yellow]")
+        generator = self.brain.stream_chat(prompt)
+        
+        full_response = ""
+        for chunk in generator:
+            full_response += chunk
+            
+        return self._process_generated_code(user_request, full_response, skill_name)
+
     def generate_and_test_skill(self, user_request: str) -> str:
         prompt = f"""
         You are in Code Generation Mode.
@@ -88,6 +129,10 @@ class EvolutionManager:
         for chunk in generator:
             full_response += chunk
             
+        skill_name = self._generate_skill_name(user_request)
+        return self._process_generated_code(user_request, full_response, skill_name)
+
+    def _process_generated_code(self, user_request: str, full_response: str, skill_name: str) -> str:
         # Extract code block
         code = self._extract_code(full_response)
         
@@ -160,12 +205,11 @@ class EvolutionManager:
                     return None
 
         # Save to skill library
-        skill_name = self._generate_skill_name(user_request)
         skill_path = self.skills_dir / f"{skill_name}.py"
         with open(skill_path, "w", encoding="utf-8") as f:
             f.write(code)
             
-        console.print(f"[bold green]✅ New skill saved as {skill_path}[/bold green]")
+        console.print(f"[bold green]✅ Skill saved as {skill_path}[/bold green]")
         self.load_skills()
         return exec_result
 

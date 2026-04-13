@@ -61,6 +61,25 @@ def run_cli(config):
                         print(chunk, end="", flush=True)
                     print()
             
+            elif "UPDATE_SKILL:" in full_response:
+                import re
+                match = re.search(r'UPDATE_SKILL:\s*([a-zA-Z0-9_]+)', full_response)
+                if match:
+                    skill_name = match.group(1)
+                    console.print(f"\n[bold yellow]🔄 G4A is updating existing skill: {skill_name}...[/bold yellow]")
+                    result = evo_mgr.update_and_test_skill(user_input, skill_name)
+                    if result:
+                        console.print("\n[bold green]🎯 Final Execution Result:[/bold green]")
+                        console.print(result)
+                        brain.history.append({"role": "system", "content": f"The updated skill {skill_name} returned this result: {result}"})
+                        
+                        # Ask LLM to summarize the result for the user
+                        console.print("\n[bold magenta]G4A > [/bold magenta]", end="")
+                        summary_generator = brain.stream_chat("Skill updated and executed successfully. Please summarize the result for the user naturally based on the data above.")
+                        for chunk in summary_generator:
+                            print(chunk, end="", flush=True)
+                        print()
+                        
             elif "EXECUTE_SKILL:" in full_response:
                 import re
                 match = re.search(r'EXECUTE_SKILL:\s*([a-zA-Z0-9_]+)', full_response)
