@@ -53,6 +53,13 @@ def run_cli(config):
                     console.print("\n[bold green]🎯 Final Execution Result:[/bold green]")
                     console.print(result)
                     brain.history.append({"role": "system", "content": f"The newly generated skill returned this result: {result}"})
+                    
+                    # Ask LLM to summarize the result for the user
+                    console.print("\n[bold magenta]G4A > [/bold magenta]", end="")
+                    summary_generator = brain.stream_chat("Skill executed successfully. Please summarize the result for the user naturally based on the data above.")
+                    for chunk in summary_generator:
+                        print(chunk, end="", flush=True)
+                    print()
             
             elif "EXECUTE_SKILL:" in full_response:
                 import re
@@ -61,9 +68,16 @@ def run_cli(config):
                     skill_name = match.group(1)
                     console.print(f"\n[bold yellow]⚙️ Executing existing skill: {skill_name}...[/bold yellow]")
                     result = evo_mgr.execute_skill(skill_name)
-                    console.print("\n[bold green]🎯 Final Execution Result:[/bold green]")
+                    console.print("\n[bold green]🎯 Raw Execution Result:[/bold green]")
                     console.print(result)
                     brain.history.append({"role": "system", "content": f"The skill {skill_name} returned this result: {result}"})
+                    
+                    # Ask LLM to summarize the result for the user
+                    console.print("\n[bold magenta]G4A > [/bold magenta]", end="")
+                    summary_generator = brain.stream_chat("Skill executed successfully. Please summarize the raw result for the user naturally based on the data above.")
+                    for chunk in summary_generator:
+                        print(chunk, end="", flush=True)
+                    print()
                 
         except Exception as e:
             console.print(f"\n[bold red]Error connecting to brain: {e}[/bold red]")
