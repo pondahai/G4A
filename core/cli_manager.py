@@ -33,7 +33,10 @@ def run_cli(config):
         
         # Determine if we can answer or need a skill, then execute
         try:
-            response_generator = brain.stream_chat(safe_input)
+            skills_str = ", ".join(evo_mgr.list_skills()) if evo_mgr.list_skills() else "None"
+            enhanced_input = f"<system_context>\nAvailable Skills: {skills_str}\n</system_context>\n{safe_input}"
+            
+            response_generator = brain.stream_chat(enhanced_input)
             
             console.print("[bold magenta]G4A > [/bold magenta]", end="")
             full_response = ""
@@ -45,7 +48,22 @@ def run_cli(config):
             # Post-process: Check if a new tool generation is needed
             if "NEEDS_NEW_SKILL" in full_response:
                 console.print("[bold yellow]🧠 G4A detects a missing capability. Entering Code Generation Mode...[/bold yellow]")
-                evo_mgr.generate_and_test_skill(user_input)
+                result = evo_mgr.generate_and_test_skill(user_input)
+                if result:
+                    console.print("\n[bold green]🎯 Final Execution Result:[/bold green]")
+                    console.print(result)
+                    brain.history.append({"role": "system", "content": f"The newly generated skill returned this result: {result}"})
+            
+            elif "EXECUTE_SKILL:" in full_response:
+                import re
+                match = re.search(r'EXECUTE_SKILL:\s*([a-zA-Z0-9_]+)', full_response)
+                if match:
+                    skill_name = match.group(1)
+                    console.print(f"\n[bold yellow]⚙️ Executing existing skill: {skill_name}...[/bold yellow]")
+                    result = evo_mgr.execute_skill(skill_name)
+                    console.print("\n[bold green]🎯 Final Execution Result:[/bold green]")
+                    console.print(result)
+                    brain.history.append({"role": "system", "content": f"The skill {skill_name} returned this result: {result}"})
                 
         except Exception as e:
             console.print(f"\n[bold red]Error connecting to brain: {e}[/bold red]")

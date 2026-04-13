@@ -51,7 +51,20 @@ class EvolutionManager:
     def list_skills(self):
         return list(self.loaded_skills.keys())
 
-    def generate_and_test_skill(self, user_request: str):
+    def execute_skill(self, skill_name: str) -> str:
+        if skill_name in self.loaded_skills:
+            try:
+                module = self.loaded_skills[skill_name]
+                if hasattr(module, 'run_skill'):
+                    result = module.run_skill()
+                    return str(result)
+                else:
+                    return f"Error: Skill module '{skill_name}' is missing 'run_skill()' function."
+            except Exception as e:
+                return f"Error executing {skill_name}: {e}"
+        return f"Skill {skill_name} not found."
+
+    def generate_and_test_skill(self, user_request: str) -> str:
         prompt = f"""
         You are in Code Generation Mode.
         The user asked for: "{user_request}"
@@ -90,7 +103,7 @@ class EvolutionManager:
             
         if not code:
             console.print("[red]❌ Failed to extract Python code from response even after retry.[/red]")
-            return
+            return None
 
         console.print("\n[bold cyan]Generated Code:[/bold cyan]")
         syntax = Syntax(code, "python", theme="monokai", line_numbers=True)
@@ -100,7 +113,7 @@ class EvolutionManager:
         confirm = console.input("\n[bold yellow]Do you approve this code for execution and saving? (y/N) > [/bold yellow]").strip().lower()
         if confirm != 'y':
             console.print("[red]❌ Code rejected by user.[/red]")
-            return
+            return None
 
         # AST Safety Check
         try:
@@ -109,18 +122,18 @@ class EvolutionManager:
             console.print("[green]✅ Safety scan passed.[/green]")
         except SafetyError as e:
             console.print(f"[bold red]❌ Safety scan failed:[/bold red] {e}")
-            self._self_refine(user_request, code, str(e))
-            return
+            return self._self_refine(user_request, code, str(e))
 
+        exec_result = ""
         # Sandbox Execution
         if self.sandbox.client:
             console.print("[yellow]📦 Executing in Docker Sandbox...[/yellow]")
             result = self.sandbox.execute_code(code)
             if not result["success"]:
                 console.print(f"[bold red]❌ Execution failed in sandbox:[/bold red]\n{result['output']}")
-                self._self_refine(user_request, code, result['output'])
-                return
+                return self._self_refine(user_request, code, result['output'])
             console.print(f"[green]✅ Execution successful:[/green]\n{result['output']}")
+            exec_result = result['output']
         else:
             console.print("[yellow]⚠️ Docker not available, executing locally (Warning: Unsandboxed)...[/yellow]")
             import subprocess
@@ -135,12 +148,12 @@ class EvolutionManager:
                     res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True, encoding="utf-8", timeout=10, env=env)
                     if res.returncode != 0:
                         console.print(f"[bold red]❌ Execution failed locally:[/bold red]\n{res.stderr}")
-                        self._self_refine(user_request, code, res.stderr)
-                        return
+                        return self._self_refine(user_request, code, res.stderr)
                     console.print(f"[green]✅ Execution successful:[/green]\n{res.stdout}")
+                    exec_result = res.stdout
                 except Exception as e:
                     console.print(f"[bold red]❌ Execution failed:[/bold red] {e}")
-                    return
+                    return None
 
         # Save to skill library
         skill_name = self._generate_skill_name(user_request)
@@ -150,6 +163,7 @@ class EvolutionManager:
             
         console.print(f"[bold green]✅ New skill saved as {skill_path}[/bold green]")
         self.load_skills()
+        return exec_result
 
     def _extract_code(self, response: str) -> str:
         if "```python" in response:
@@ -162,10 +176,10 @@ class EvolutionManager:
                 return parts[1].strip()
         return ""
 
-    def _self_refine(self, original_request: str, failed_code: str, error_msg: str, attempt: int = 1):
+    def _self_refine(self, original_request: str, failed_code: str, error_msg: str, attempt: int = 1) -> str:
         if attempt > 3:
             console.print("[red]❌ Self-refinement failed after 3 attempts. Giving up.[/red]")
-            return
+            return None
 
         console.print(f"[yellow]🔄 Initiating Self-Refinement (Attempt {attempt}/3) based on error...[/yellow]")
         refine_prompt = f"""
@@ -186,7 +200,7 @@ class EvolutionManager:
         code = self._extract_code(full_response)
         if not code:
              console.print("[red]❌ Failed to extract Python code from refinement response.[/red]")
-             return
+             return None
              
         console.print("\n[bold cyan]Refined Code:[/bold cyan]")
         syntax = Syntax(code, "python", theme="monokai", line_numbers=True)
@@ -195,7 +209,7 @@ class EvolutionManager:
         confirm = console.input("\n[bold yellow]Do you approve this refined code for execution and saving? (y/N) > [/bold yellow]").strip().lower()
         if confirm != 'y':
             console.print("[red]❌ Refined code rejected by user.[/red]")
-            return
+            return None
             
         # Re-run the tests (Recursive)
         try:
@@ -204,9 +218,9 @@ class EvolutionManager:
             console.print("[green]✅ Safety scan passed.[/green]")
         except SafetyError as e:
             console.print(f"[bold red]❌ Safety scan failed:[/bold red] {e}")
-            self._self_refine(original_request, code, str(e), attempt + 1)
-            return
+            return self._self_refine(original_request, code, str(e), attempt + 1)
             
+        exec_result = ""
         # Local execution test since Sandbox logic is identical here for brevity.
         console.print("[yellow]⚠️ Docker not available, executing locally (Warning: Unsandboxed)...[/yellow]")
         import subprocess
@@ -221,12 +235,12 @@ class EvolutionManager:
                 res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True, encoding="utf-8", timeout=10, env=env)
                 if res.returncode != 0:
                     console.print(f"[bold red]❌ Execution failed locally:[/bold red]\n{res.stderr}")
-                    self._self_refine(original_request, code, res.stderr, attempt + 1)
-                    return
+                    return self._self_refine(original_request, code, res.stderr, attempt + 1)
                 console.print(f"[green]✅ Execution successful:[/green]\n{res.stdout}")
+                exec_result = res.stdout
             except Exception as e:
                 console.print(f"[bold red]❌ Execution failed:[/bold red] {e}")
-                return
+                return None
 
         # Save to skill library
         skill_name = self._generate_skill_name(original_request)
@@ -236,6 +250,7 @@ class EvolutionManager:
             
         console.print(f"[bold green]✅ New skill saved as {skill_path}[/bold green]")
         self.load_skills()
+        return exec_result
 
     def _generate_skill_name(self, request: str) -> str:
         # Try to ask LLM for a good name

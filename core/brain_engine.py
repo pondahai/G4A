@@ -13,17 +13,28 @@ class BrainEngine:
         self.system_prompt = """You are G4A (Gemma 4 Agent), an advanced AI assistant capable of self-evolution.
 You do NOT have real-time access to the internet, local files, or system states natively.
 If a user asks for something requiring external information, computation, or system actions (e.g., getting IP, scraping web, calculating complex math), you MUST NOT hallucinate, guess, or simulate the answer.
-Instead, you MUST output EXACTLY 'NEEDS_NEW_SKILL' (with optional <thinking> tags before it) so the system can generate a Python script to find the real answer.
+
+Please check the <system_context> for Available Skills provided in the user prompt.
+- If an existing skill can fulfill the request, you MUST output EXACTLY: EXECUTE_SKILL: <skill_name>
+- If NO existing skill can fulfill the request, you MUST output EXACTLY: NEEDS_NEW_SKILL
+
+(You may use <thinking> tags before your final command).
 Strictly adhere to security and modularity constraints."""
 
     def clear_memory(self):
         self.history = []
 
-    def stream_chat(self, user_input):
+    def stream_chat(self, user_input, is_retry=False):
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(self.history)
-        messages.append({"role": "user", "content": user_input})
         
+        if not is_retry:
+            messages.append({"role": "user", "content": user_input})
+            self.history.append({"role": "user", "content": user_input})
+        else:
+            # If it's a retry, we append the prompt directly without saving it to visible history
+            messages.append({"role": "user", "content": user_input})
+            
         payload = {
             "model": self.model,
             "messages": messages,
@@ -73,8 +84,28 @@ Strictly adhere to security and modularity constraints."""
                 except json.JSONDecodeError:
                     pass
 
-        self.history.append({"role": "user", "content": user_input})
-        self.history.append({"role": "assistant", "content": assistant_response})
+        # 第三道防線：強制接續遞迴 (Forced Continuation Loop)
+        import re
+        # Check if the response ONLY contains <thinking>...</thinking> or is empty after removing it
+        action_text = re.sub(r'<thinking>.*?</thinking>', '', assistant_response, flags=re.DOTALL).strip()
+        
+        if "<thinking>" in assistant_response and not action_text and not is_retry:
+            yield "\n\n[System: 偵測到模型陷入思考癱瘓 (Planning Paralysis)，觸發強制接續防線...]\n"
+            self.history.append({"role": "assistant", "content": assistant_response})
+            
+            kick_prompt = "You only outputted a <thinking> process without any actual action or conclusion. Please stop planning and strictly output the final action (e.g., 'NEEDS_NEW_SKILL') or the direct answer now."
+            
+            # Recursively call stream_chat with the kick prompt
+            retry_generator = self.stream_chat(kick_prompt, is_retry=True)
+            retry_response = ""
+            for chunk in retry_generator:
+                retry_response += chunk
+                yield chunk
+                
+            assistant_response += "\n" + retry_response
+            
+        if not is_retry:
+            self.history.append({"role": "assistant", "content": assistant_response})
 
     def generate_short_name(self, text: str) -> str:
         messages = [
