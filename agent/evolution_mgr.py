@@ -77,8 +77,19 @@ class EvolutionManager:
             
         # Extract code block
         code = self._extract_code(full_response)
+        
+        # 強硬解析與重試 (Hard Parse & Retry)
         if not code:
-            console.print("[red]❌ Failed to extract Python code from response.[/red]")
+            console.print("[yellow]⚠️ 偵測不到標準代碼塊，觸發格式遺忘修正 (Format Forgetting Correction)...[/yellow]")
+            retry_prompt = "I did not find a standard ```python code block. Please ONLY output the ```python ... ``` block. Do not include any other text or thinking."
+            retry_generator = self.brain.stream_chat(retry_prompt, is_retry=True)
+            retry_response = ""
+            for chunk in retry_generator:
+                retry_response += chunk
+            code = self._extract_code(retry_response)
+            
+        if not code:
+            console.print("[red]❌ Failed to extract Python code from response even after retry.[/red]")
             return
 
         console.print("\n[bold cyan]Generated Code:[/bold cyan]")
