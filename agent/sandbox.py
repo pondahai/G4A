@@ -10,7 +10,7 @@ class Sandbox:
             self.client = docker.from_env()
         except Exception as e:
             self.client = None
-            print(f"Warning: Docker not available. Sandbox is disabled. Error: {e}")
+            # Silently fallback; EvolutionManager will warn when executing without sandbox.
 
     def execute_code(self, code: str, timeout: int = 10) -> dict:
         if not self.client:
