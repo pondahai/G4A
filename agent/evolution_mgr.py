@@ -109,6 +109,10 @@ class EvolutionManager:
         syntax = Syntax(code, "python", theme="monokai", line_numbers=True)
         console.print(syntax)
 
+        if "def run_skill(" not in code:
+            console.print("[red]❌ Generated code is missing the required 'run_skill()' function.[/red]")
+            return self._self_refine(user_request, code, "The code is missing the required `run_skill()` function. You MUST define a function named `run_skill()` that executes the core logic and returns a string.")
+
         # Human-in-the-loop (HITL)
         confirm = console.input("\n[bold yellow]Do you approve this code for execution and saving? (y/N) > [/bold yellow]").strip().lower()
         if confirm != 'y':
@@ -205,6 +209,10 @@ class EvolutionManager:
         console.print("\n[bold cyan]Refined Code:[/bold cyan]")
         syntax = Syntax(code, "python", theme="monokai", line_numbers=True)
         console.print(syntax)
+        
+        if "def run_skill(" not in code:
+            console.print("[red]❌ Refined code is still missing the required 'run_skill()' function.[/red]")
+            return self._self_refine(original_request, code, "The code is missing the required `run_skill()` function. You MUST define a function named `run_skill()` that executes the core logic and returns a string.", attempt + 1)
         
         confirm = console.input("\n[bold yellow]Do you approve this refined code for execution and saving? (y/N) > [/bold yellow]").strip().lower()
         if confirm != 'y':
