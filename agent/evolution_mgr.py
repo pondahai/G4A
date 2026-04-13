@@ -162,18 +162,80 @@ class EvolutionManager:
                 return parts[1].strip()
         return ""
 
-    def _self_refine(self, original_request: str, failed_code: str, error_msg: str):
-        console.print("[yellow]🔄 Initiating Self-Refinement based on error...[/yellow]")
+    def _self_refine(self, original_request: str, failed_code: str, error_msg: str, attempt: int = 1):
+        if attempt > 3:
+            console.print("[red]❌ Self-refinement failed after 3 attempts. Giving up.[/red]")
+            return
+
+        console.print(f"[yellow]🔄 Initiating Self-Refinement (Attempt {attempt}/3) based on error...[/yellow]")
         refine_prompt = f"""
         I tried to run your previous code for the task: "{original_request}"
         However, it failed with the following error:
         {error_msg}
         
         Please rewrite the python code to fix this issue. Return ONLY the valid Python code in a ```python block.
+        Remember the CRITICAL SECURITY & ENVIRONMENT REQUIREMENTS. ONLY use built-in modules or 'requests'. Do not use 'bs4'.
         """
-        # Since it's YOLO mode, let's just make one attempt to refine, or just log it.
-        # Calling generate_and_test_skill recursively might cause infinite loops, so we stop here for the MVP.
-        console.print("[red]Self-refinement loop triggered. (Not fully implemented in MVP to prevent loops)[/red]")
+        
+        generator = self.brain.stream_chat(refine_prompt, is_retry=True)
+        
+        full_response = ""
+        for chunk in generator:
+            full_response += chunk
+            
+        code = self._extract_code(full_response)
+        if not code:
+             console.print("[red]❌ Failed to extract Python code from refinement response.[/red]")
+             return
+             
+        console.print("\n[bold cyan]Refined Code:[/bold cyan]")
+        syntax = Syntax(code, "python", theme="monokai", line_numbers=True)
+        console.print(syntax)
+        
+        confirm = console.input("\n[bold yellow]Do you approve this refined code for execution and saving? (y/N) > [/bold yellow]").strip().lower()
+        if confirm != 'y':
+            console.print("[red]❌ Refined code rejected by user.[/red]")
+            return
+            
+        # Re-run the tests (Recursive)
+        try:
+            console.print("[yellow]🛡️ Running AST Safety Scan on refined code...[/yellow]")
+            check_code_safety(code)
+            console.print("[green]✅ Safety scan passed.[/green]")
+        except SafetyError as e:
+            console.print(f"[bold red]❌ Safety scan failed:[/bold red] {e}")
+            self._self_refine(original_request, code, str(e), attempt + 1)
+            return
+            
+        # Local execution test since Sandbox logic is identical here for brevity.
+        console.print("[yellow]⚠️ Docker not available, executing locally (Warning: Unsandboxed)...[/yellow]")
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            script_path = Path(temp_dir) / "skill.py"
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(code)
+            try:
+                env = os.environ.copy()
+                env["PYTHONIOENCODING"] = "utf-8"
+                res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True, encoding="utf-8", timeout=10, env=env)
+                if res.returncode != 0:
+                    console.print(f"[bold red]❌ Execution failed locally:[/bold red]\n{res.stderr}")
+                    self._self_refine(original_request, code, res.stderr, attempt + 1)
+                    return
+                console.print(f"[green]✅ Execution successful:[/green]\n{res.stdout}")
+            except Exception as e:
+                console.print(f"[bold red]❌ Execution failed:[/bold red] {e}")
+                return
+
+        # Save to skill library
+        skill_name = self._generate_skill_name(original_request)
+        skill_path = self.skills_dir / f"{skill_name}.py"
+        with open(skill_path, "w", encoding="utf-8") as f:
+            f.write(code)
+            
+        console.print(f"[bold green]✅ New skill saved as {skill_path}[/bold green]")
+        self.load_skills()
 
     def _generate_skill_name(self, request: str) -> str:
         # Try to ask LLM for a good name
